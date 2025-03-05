@@ -29,6 +29,7 @@ class BaseTrainer(pl.Trainer):
 
 
         strategy = strategy if gpu_count > 1 else None
+        strategy = strategy if gpu_count > 1 else "auto"
 
         progress_bar = CustomProgressBar()
         early_stopping = EarlyStopping(early_stopping_config["key_to_monitor"],
@@ -56,7 +57,7 @@ class BaseTrainer(pl.Trainer):
             logger=[tb_logger], # csv_logger],
             accelerator=accelerator,
             strategy=strategy,
-            gpus=gpu_count,
+            devices=gpu_count,
             log_every_n_steps=400, enable_progress_bar=True, detect_anomaly=False)
 
         if checkpoint_path is not None:
@@ -81,6 +82,9 @@ class BaseLightningModule(pl.LightningModule):
         self.loss = loss
 
         self.log_step = log_step
+        self.train_outputs = []
+        self.validation_outputs = []
+        self.test_outputs = []
 
     def _step(self, batch, batch_idx, log_model_output=False,
               log_labels=False):
@@ -99,26 +103,28 @@ class BaseLightningModule(pl.LightningModule):
         # TODO: Add these to a callback
         # 2. Log model output
         if log_model_output:
-
             output_dict["model_output"] = output
 
         # 3. Log step metrics
-        self.log("loss_epoch", output_dict["loss"],
-                 on_step=False, prog_bar=False,on_epoch=True)
+        #self.log("loss_epoch", output_dict["loss"],
+        #         on_step=False, prog_bar=False,on_epoch=True)
 
         return output_dict
 
     def training_step(self, batch, batch_idx):
-
-        return self._step(batch, batch_idx,log_model_output=False)
+        output = self._step(batch, batch_idx,log_model_output=False)
+        self.train_outputs += [output]
+        return output
 
     def validation_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx,
-                          log_model_output=False, log_labels=True)
+        output = self._step(batch, batch_idx, log_model_output=False, log_labels=True)
+        self.validation_outputs += [output]
+        return output
 
     def test_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx,
-                          log_model_output=False, log_labels=True)
+        output = self._step(batch, batch_idx, log_model_output=False, log_labels=True)
+        self.test_outputs += [output]
+        return output
 
     def _epoch_end(self, outputs, epoch_type="train", save_pickle=False):
         # 1. Compute epoch metrics
@@ -132,7 +138,6 @@ class BaseLightningModule(pl.LightningModule):
         # outputs.detach()
         # 2. Log epoch metrics
         for key, value in epoch_stats.items():
-
             self.log(key, value, on_epoch=True, prog_bar=True)
 
         # 3. Save complete epoch data on pickle
@@ -143,14 +148,14 @@ class BaseLightningModule(pl.LightningModule):
 
         return epoch_stats
 
-    def training_epoch_end(self, outputs):
-        self._epoch_end(outputs)
+    def on_train_epoch_end(self):
+        self._epoch_end(self.train_outputs)
 
-    def validation_epoch_end(self, outputs):
-        self._epoch_end(outputs, epoch_type="validation")
+    def on_validation_epoch_end(self):
+        self._epoch_end(self.validation_outputs, epoch_type="validation")
 
-    def test_epoch_end(self, outputs):
-        self._epoch_end(outputs, epoch_type="test", save_pickle=True)
+    def on_test_epoch_end(self):
+        self._epoch_end(self.test_outputs, epoch_type="test", save_pickle=True)
 
     def forward(self, x):
         return self.model(x)

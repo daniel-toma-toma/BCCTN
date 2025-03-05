@@ -19,6 +19,7 @@ class DCNN(nn.Module):
             kernel_num=[16, 32, 64, 128, 256,256], 
             # kernel_num = [ 8, 16, 32, 64, 128, 128],
             bidirectional=False, embed_dim=1024, num_heads=32, **kwargs
+            symmetric=False,
     ):
         ''' 
             rnn_layers: the number of lstm layers in the crn,
@@ -54,6 +55,7 @@ class DCNN(nn.Module):
                                     num_heads=self.num_heads,
                                     batch_first=True)
 
+        self.symmetric = symmetric
         self.encoder = Encoder(self.kernel_num, kernel_size)
         # self._create_rnn(rnn_layers)
         # self.attn = FAL(in_channels=1, out_channels=96, f_length=256)

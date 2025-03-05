@@ -46,6 +46,6 @@ class BaseDataset(torch.utils.data.Dataset):
 
     def _get_file_paths(self, dataset_dir):
         file_paths = [
-            os.path.join(dataset_dir / fp) for fp in sorted(Path(dataset_dir).rglob('*.wav'))
+            os.path.join(dataset_dir / fp) for fp in sorted(Path(dataset_dir).rglob('*.flac'))
         ]
         return file_paths
